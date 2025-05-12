@@ -1,0 +1,82 @@
+# /replit_supabase_wss_test.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Manual Supabase WSS connection tester for real-time channel analysis and fuzzing.
+"""
+
+import websocket
+import threading
+import json
+import time
+
+SUPABASE_PROJECT_ID = "your-project-id"  # e.g. abcd1234xyz
+SUPABASE_API_KEY = "your-anon-or-service-role-key"
+SUPABASE_JWT = "your-jwt"  # Use anon/public or service token depending on context
+
+# Build the WSS URL
+WSS_URL = f"wss://{SUPABASE_PROJECT_ID}.supabase.co/realtime/v1/websocket"
+
+def on_message(ws, message):
+    print(f"[+] Incoming message:\n{message}\n")
+
+def on_error(ws, error):
+    print(f"[!] WebSocket error: {error}")
+
+def on_close(ws, close_status_code, close_msg):
+    print(f"[-] WebSocket closed: {close_status_code} {close_msg}")
+
+def on_open(ws):
+    print("[*] WebSocket opened.")
+
+    # Step 1: Join the Phoenix socket
+    ws.send(json.dumps({
+        "topic": "phoenix",
+        "event": "phx_join",
+        "payload": {},
+        "ref": "1"
+    }))
+
+    # Step 2: Authenticate
+    ws.send(json.dumps({
+        "topic": "realtime:public:your_table",  # Adjust schema:table
+        "event": "phx_join",
+        "payload": {
+            "access_token": SUPABASE_JWT
+        },
+        "ref": "2"
+    }))
+
+    # Step 3: Optionally send a manual test payload or fuzz input
+    # Example insert event (does not actually insert into DB, just a test format)
+    # ws.send(json.dumps({
+    #     "topic": "realtime:public:your_table",
+    #     "event": "INSERT",
+    #     "payload": {"data": {"id": 1, "value": "test"}},
+    #     "ref": "3"
+    # }))
+
+if __name__ == "__main__":
+    websocket.enableTrace(False)
+    ws = websocket.WebSocketApp(
+        WSS_URL,
+        header=[
+            f"apikey: {SUPABASE_API_KEY}",
+            f"Authorization: Bearer {SUPABASE_JWT}"
+        ],
+        on_open=on_open,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close
+    )
+
+    # Run in a separate thread to allow interaction or fuzzing
+    wst = threading.Thread(target=ws.run_forever, kwargs={"ping_interval": 30})
+    wst.daemon = True
+    wst.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        ws.close()
