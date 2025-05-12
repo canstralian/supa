@@ -1,14 +1,23 @@
-import os
-from supabase import create_client, Client
 
-# create a Supabase client to connect to your db
-url: str = "https://ernhobnpmmupjnmxpfbt.supabase.co"
-key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVybmhvYm5wbW11cGpubXhwZmJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDYyODQwMDgsImV4cCI6MTk2MTg2MDAwOH0.UQsOkUsIn9hTjYJuSldMikKSXeUxanVTgP04XrPp05M"
-supabase: Client = create_client(url, key)
+from fastapi import FastAPI
+import httpx
 
-# query the database for all countries in Asia
-response = supabase.table("countries").select("name").eq('continent', 'Asia').order('name').execute()
+app = FastAPI()
 
-# print country names
-for country in response.data:
-  print(country['name'])
+async def fetch_data(url):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        return response.json()
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+
+@app.get("/fetch/{url:path}")
+async def fetch_endpoint(url: str):
+    data = await fetch_data(f"https://{url}")
+    return data
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000)
